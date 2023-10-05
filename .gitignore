@@ -1,0 +1,8 @@
+*.pdf
+*.zip
+*.tar
+*.msi
+
+*.csv
+*.RData
+*.txt

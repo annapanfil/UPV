@@ -1,0 +1,376 @@
+---
+title: "Biomedical Data Science - Data Quality lab session"
+author: |
+  | Carlos Sáez <carsaesi@upv.es>
+  | Anna Panfil
+  | Igor Czudy
+  |
+  | Biomedical Data Science Lab, Departamento of Applied Physics, Universitat Politècnica de València, España
+date: "October, 2022"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc-title: Contenido
+    number_sections: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+
+# IMPORTANT! -> For the development of the practice on your computers, remove the parameter 'eval = FALSE' from the following line).
+knitr::opts_chunk$set(echo = TRUE, message = FALSE) #, eval = FALSE)
+
+```
+
+# Introduction
+
+This practice is part of the subject *Biomedical Data Science* of the *Degree in Data Science* of the *Universitat Politècnica de València*, and taught by the *Department of Applied Physics*.
+
+The measurement of data quality dimensions (DQ) is the central axis for the evaluation and improvement of data quality as well as for its correct and optimal use. Data quality dimensions are individual aspects or constructs that represent data quality attributes. To these can be associated one or more metrics, quantified with specific methods, as well as exploratory methods.
+
+This practice is intended to provide an initial basis for the evaluation of DQ metrics. It will consist of the application of a series of methods for different dimensions of DQ. In the context of the maternal and child clinical setting, we will analyze a data file whose ultimate purpose is the monitoring of care indicators in this setting. Depending on the dimension, we will apply the methods and calculate the metrics both in general for the whole dataset and monitored over batches of time (by months), simulating the results of a DQ monitoring and continuous improvement system.
+
+In some parts of the code we will find the text ##TODO## that we will need to complete. Additionally, we will have to discuss the results in those points where it is indicated. The deliverable of the practice will consist of the compilation in *html* of this *R markdown* file, using *Knit*, where the results of the execution and figures will be observed, and having completed the ##TODO## and commented the results.
+
+# Preparation of the work environment
+
+We check that the working directory is in the one where we have the practice file and the folder with the data:
+
+```{r eval=FALSE}
+getwd()
+```
+
+Otherwise, we set it (change the example directory to ours):
+
+```{r eval=FALSE}
+setwd("D:/PRACTICAS/P3")
+```
+
+We install the required libraries and then load them into the working environment.
+
+```{r eval=FALSE}
+install.packages("zoo", repos = "http://cran.us.r-project.org")
+install.packages("rts", repos = "http://cran.us.r-project.org")
+install.packages("plotly", repos = "http://cran.us.r-project.org")
+install.packages("devtools", repos = "http://cran.us.r-project.org")
+```
+
+```{r eval=FALSE}
+library("devtools")
+devtools::install_github('c5sire/datacheck')
+devtools::install_github("hms-dbmi/EHRtemporalVariability")
+```
+
+```{r warning=FALSE}
+library("zoo")
+library("rts")
+library("plotly")
+library("datacheck")
+library("EHRtemporalVariability")
+```
+
+# Data loading
+
+We set the initial parameters of the data. The main date of the records, which will be used for the purpose of monitoring the delivery care indicators, is the date of birth.
+
+```{r }
+# File name
+fileName = "data/DQIinfantFeeding.csv"
+# Whether it has a header or not
+hasHeader = TRUE
+# Main date column to be used for monitoring purposes
+dateColumn = "BIRTH_DATE"
+# Format of the previous date
+dateFormat = '%d/%m/%Y'
+# Which text string will represent missing data
+missingValue = "NULL"
+```
+
+We load the file **data/DQIinfantFeeding.csv** in a **data.frame** named **repository**:
+
+```{r }
+repository <- read.csv2(fileName, header=hasHeader, na.strings=missingValue)
+
+# We collect the number of rows and columns
+
+N <- nrow(repository)
+D <- ncol(repository)
+```
+
+For monitoring purposes, we will use the **zoo** library (*S3 Infrastructure for Regular and Irregular Time Series - Z's Ordered Observations*) to convert the data, the *data.frame*, to a format suited for batch analyses, the *zoo* format.
+
+```{r warning=FALSE}
+zooRepository <- read.zoo(repository,format = dateFormat,index.column = dateColumn)
+```
+
+# Problem in the monitoring of indicators
+
+One of the main uses of the maternal and infant data repository studied is the monitoring of quality of care indicators. In the field of newborn feeding, one of the most important indicators is whether there has been early initiation of breastfeeding in the delivery room. To calculate this indicator, we create the following function that will obtain the indicator for each batch of data received, so that we can apply it repeatedly for each batch given a frequency.
+
+```{r}
+
+# how much woman started to breastfeed during the 1st hour in delivery room between all woman who didn't declare they don't want ot breastfeed.
+
+indicatorEBF_delroom <- function(dataset){
+  
+  numerator = (dataset$NEO_MOMFBF_TYPE %in% 'During the 1st hour') &
+    (dataset$NEO_PFBF_TYPE %in% 'Delivery room') &
+    (dataset$DEL_MODE %in% c('Vaginal delivery', 'Thierry\'s spatulas', 'Forceps delivery', 'Vacuum delivery'))
+
+  denominator = (dataset$NEO_MOMFBF_TYPE %in% c('During the 1st hour', 'During the 2nd hour', 'During the 3rd hour','Breastfeeding does not start')) &
+    (dataset$NEO_PFBF_TYPE %in% c('Delivery room', 'Hospitalization unit', 'Breastfeeding does not start')) &
+    !(dataset$NEO_FBFEVAL_TY %in% 'Undesired breastfeeding') &
+    (dataset$DEL_MODE %in% c('Vaginal delivery', 'Thierry\'s spatulas', 'Forceps delivery', 'Vacuum delivery'))
+
+  indicator = sum(numerator)/sum(denominator) * 100
+  
+  if (sum(denominator) == 0){
+    print("denominator is 0")
+  }
+  
+  return(indicator)
+}
+
+```
+
+Once the function is loaded in the environment, we can easily apply it to the batches of data at the desired time frequency using the **apply** family of functions from the **xts** (*Raster Time Series Analysis*) library. In this monthly case, we will use **apply.monthly**, to which we will pass as parameters the repository converted to **zoo** and the previously created function:
+
+```{r }
+
+resIndicatorES2SC_delroom =apply.monthly(zooRepository, FUN=indicatorEBF_delroom)
+
+plot(resIndicatorES2SC_delroom,xlab = "Date", ylab ="%",main = "Early breastfeeding start in the delivery room", ylim=c(0,100))
+
+#resIndicatorES2SC_delroom
+
+```
+
+------------------------------------------------------------------------
+
+📝 *DISCUSS RESULTS*
+
+The indicator describes how much woman who deliverd in certain ways started to breastfeed during the 1st hour in delivery room between all such woman who didn't declare they don't want ot breastfeed.
+
+We can see that overall indicator is quite high, fluctuating between around 77 and 100%. Between IIQ 2009 and IIQ 2011 we don't have woman matching our denominator, disturbing us from calculating the indicator values during this period. It is possible that this was a trend of declaring not breastfeeding, many woman delivered by caesarea, we have some missing values in our dataset or other case occured. We'll examine some of these possibilities further.
+
+------------------------------------------------------------------------
+
+# Completeness
+
+## General
+
+We will find the missing data in the repository and calculate the corresponding metrics. First, for each variable:
+
+```{r }
+NAmatrix <- !is.na(repository)
+sumNAmatrix <- apply(NAmatrix,2,sum)
+completenessByColumn <- round(sumNAmatrix/N*100,2)
+completenessByColumn
+```
+
+Next, we will calculate and display the overall percentage of missing data:
+
+```{r }
+completenessByDataset = round(sum(NAmatrix)/(N*D)*100,2) #round(sum(completenessByColumn)/D, 2)
+completenessByDataset
+```
+
+```{r}
+knitr::kable(table(repository$DEL_TYPE_ANE), format = "markdown")
+```
+
+------------------------------------------------------------------------
+
+📝 *DISCUSS RESULTS*
+
+We have many missing values in Apgar score and some in weight column. Other features are complete. It means 95.12% of our data is complete. It's quite high score. However, the number of missing values for Apgar score may exclude this feature from prediction further. However, it seems that not all values are considered. E.g. for anestestesia type we have 135 values with empty string, which should probably be treated as a null value as well.
+
+------------------------------------------------------------------------
+
+## Monitoring
+
+To monitor the completeness by temporary batches we will create a function that does this calculation for each batch it receives as a parameter, and returns the completeness for each column, the function **dimCompletessByColumn**:
+
+```{r }
+dimCompletenessByColumn <- function(repository){
+  N = dim(repository)[1]
+  NAmatrix <- !is.na(repository)
+  sumNAmatrix <- apply(NAmatrix,2,sum)
+  completenessByColumn <- round(sumNAmatrix/N*100,2)
+  return(completenessByColumn)
+}
+
+```
+
+Once the function is loaded in the environment, we can easily apply it to the batches of data at the desired time frequency using the **apply** family of functions from the **xts** (*Raster Time Series Analysis*) library. In this monthly case, we will use **apply.monthly**, to which we will pass as parameters the repository converted to **zoo** and the previously created function:
+
+```{r }
+resCompletenessByColumn = apply.monthly(zooRepository, FUN=dimCompletenessByColumn)
+```
+
+Now, we can create a plot with the results using the **plotly** library (Create Interactive Web Graphics via 'plotly.js'). First for each variable:
+
+```{r}
+p <-
+  plot_ly(
+    x = index(resCompletenessByColumn),
+    y = resCompletenessByColumn[, 1],
+    name = names(resCompletenessByColumn)[1],
+    type = 'scatter',
+    mode = 'lines'
+  ) %>%
+  plotly::layout(
+    title = 'Completeness by month',
+    xaxis = list(title = "Date"),
+    yaxis = list (title = "Completeness (%)")
+  )
+
+ for (i in 2:ncol(resCompletenessByColumn)) {
+  p = p %>% plotly::add_trace(y = resCompletenessByColumn[, i],
+    name = names(resCompletenessByColumn)[i],
+    mode = 'lines')
+}
+
+p
+```
+
+And secondly globally, being able to calculate the result from the variable **resCompletenessByColumn** and use the code to plot a single series from the previous code chunk:
+
+```{r}
+globalCompleteness <- rowMeans(resCompletenessByColumn, na.rm = TRUE)
+
+p <-
+  plot_ly(
+    x = index(globalCompleteness),
+    y = globalCompleteness,
+    name = names(globalCompleteness),
+    type = 'scatter',
+    mode = 'lines'
+  ) %>%
+  plotly::layout(
+       title = 'Completeness by month',
+    xaxis = list(title = "Date"),
+    yaxis = list (title = "Completeness (%)")
+  )
+
+p
+```
+
+------------------------------------------------------------------------
+
+📝 *DISCUSS RESULTS*
+
+The incompleteness of the data comes mostly from missing Apgar scores. There are also some weights missing. The incompletness is fluctuant and we can't see any pattern in misses. However, as mentioned in previous task, some of the null values aren't recognized as such.
+
+------------------------------------------------------------------------
+
+# Consistency
+
+We are going to analyze two multivariate consistency rules in the data. For this we will use the **datacheck** library (*Tools for Checking Data Consistency*), which allows us to write logical rules in R language, using the variable names of our data. These rules will be written in the attached file **rules.R**, the first one is provided as an example, and the second one should be coded based on the provided natural language expression rule.
+
+```{r results='hide', warning=FALSE}
+# We read the rules file
+rules = read_rules("rules.R")
+# We evaluate the rules on our data
+profile = datadict_profile(repository, rules)
+```
+
+```{r }
+# We show the account of errors for each rule
+knitr::kable(profile$checks[,c(1,3,6)])
+```
+
+```{r }
+# We list the cases that have been marked as inconsistent for each rule
+knitr::kable(profile$checks[,c(1,7)])
+```
+
+```{r}
+repository[c(58, 60, 350, 270,3703),c("DEL_MODE", "DEL_TYPE_ANE")]
+```
+
+```{r}
+746/3801
+```
+
+------------------------------------------------------------------------
+
+📝 *DISCUSS RESULT*
+
+For these two rules we found 746 inconsistencies among 3801 examples. It's almost 20% of the data. Each of these cases should be checked and fixed or deleted. It'd require a lot of work and we'd loose a lot of data. Of course each rule has exceptions, but if we'd like to use the data for predictions, we'd rather like to predict average case and not outliers.
+
+------------------------------------------------------------------------
+
+# Temporal variability
+
+We are going to analyze if there are pattern changes in the data distributions over time. To do this we will use the **EHRtemporalVariability** library (*Delineating Temporal Dataset Shifts in Electronic Health Records*). First, we change to basic type **Date** the case date, originally in text format:
+
+```{r}
+
+repositoryFormatted <- EHRtemporalVariability::formatDate(
+              input         = repository,
+              dateColumn    = "BIRTH_DATE",
+              dateFormat = dateFormat
+             )
+
+```
+
+We obtain the temporal maps from the already formatted repository using the function **estimateDataTemporalMap** and selecting a monthly period. We can get the help of the function by typing *?estimateDataTemporalMap* in the console (it is only necessary to pass the data, the column with the date, and the desired period, the rest is obtained automatically from the data).
+
+```{r}
+
+probMaps <- estimateDataTemporalMap(
+  repositoryFormatted, "BIRTH_DATE", "month")
+```
+
+Next we obtain the information geometry plots from the previously estimated temporal maps. To do this we will use the function **estimateIGTProjection** on the list of temporal maps. We are going to save the results in a variable.
+
+```{r}
+
+igtProjs <- sapply( probMaps, estimateIGTProjection )
+names( igtProjs ) <- names( probMaps )
+
+```
+
+We can observe as an example the data temporal map and information geometry temporal (IGT) plot of the variable type of anesthesia during delivery **DEL_TYPE_ANE**:
+
+```{r}
+
+plotDataTemporalMap(probMaps$DEL_TYPE_ANE)
+
+plotIGTProjection(igtProjs$DEL_TYPE_ANE, trajectory = TRUE)
+
+```
+
+In this example, we can see that over time there are changes or differences associated with synonymy of terms (*No anesthesia*, *no*, *Without anesthesia*), or even differences between upper and lower case (*spinal*, *Spinal*).
+
+Next, we are going to save the results of the temporal variability estimation in a file, so that we can upload them to the web application [EHRtemporalVariability](https://ehrtemporalvariability.upv.es/), in the **Load your RData** tab.
+
+```{r}
+
+save(probMaps, igtProjs, file = "variabilityData.RData")
+
+```
+
+Either using the web application, or obtaining the graphs in RStudio, we will study the temporal evolution of the type of delivery variable **DEL_MODE**, and discuss the results and their potential implications in the problem defined at the beginning of the practice on the monitoring of the early onset of lactation indicator, as well as propose a possible solution.
+
+------------------------------------------------------------------------
+
+📝 *DISCUSS RESULTS*
+
+![](images/Zrzut ekranu z 2023-10-25 13-48-12.png)
+
+To see the results we've used the web application. We've also looked into these articles to learn how to interpret IGT plots: [article1](http://personales.upv.es/carsaesi/EHRtemporalVariability/EHRtemporalVariability.html), [article2](https://www.researchgate.net/figure/Information-Geometric-Temporal-IGT-plot-of-demography-and-cardiovascular-disease-coding_fig1_335844364)
+
+Generally, looking at the IGT plot we can distinguish three temporal subgroups -- untill march 2009 (including) and then before and after march 2011. March 2011 represents the transition between two groups. The changes were rather among the years, we can't see sesonality in the data. We have one outlier -- November 2014. It resembles data from the beginning of 2009. Maybe it begins the new transition, because we see that December 2014 is also moved a bit closer to the 2009 subgroup. However, we don't have data to determine it.
+
+The look at the heatmap clarifies the differences. In the beginning of 2009 we had a lot of vaginal deliveries, many emergency cesareas and some vaccum deliveries and elective cesareas. The trend remained the same till March 2011, but the labels switched to lowercase. After March 2011 the labels switched back to first letter uppercase. Moreover, emergency cesareas were replaced by intrapartum cesareas and the trend for elective cesareas was stronger. November 2014 is an outlier, because there were a lot of empty string values at the time. In December 2014, we didn't see many cesareas, what may cause the lean towards 2009s.
+
+------------------------------------------------------------------------
+
+# Acknowledgments
+
+The maternal and infant data studied have been kindly provided by Ricardo García de León for educational purposes only. Their use or distribution outside this subject and practice is forbidden.

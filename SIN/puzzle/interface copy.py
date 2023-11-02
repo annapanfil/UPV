@@ -86,7 +86,7 @@ class InterfaceApp:
 
         self.algorithmbox = ttk.Combobox(self.appFrame)
         self.algorithmbox.configure(cursor="hand2", state="readonly",
-                                    values=('BFS', 'DFS (Graph Search)', 'DFS (Backtracking)', 'Voraz (Manhattan)', 'ID', 'A* Manhattan', 'A* Euclidean', 'IDA* Manhattan', 'Misplaced', 'Sequences'))
+                                    values=('BFS', 'DFS (Graph Search)', 'DFS (Backtracking)', 'Voraz (Manhattan)', 'ID', 'A* Manhattan', 'A* Euclidean', 'IDA* Manhattan', 'Misplaced', 'Sequences', 'row_column', 'nilssons_sequence'))
         self.algorithmbox.place(anchor="center", height=30, width=150, x=700, y=230)
         self.algorithmbox.bind("<<ComboboxSelected>>", self.selectAlgorithm)
 
@@ -417,14 +417,23 @@ class InterfaceApp:
             path, cost, counter, depth, runtime, nodes, max_stored = \
                 main.graphf_path, main.graphf_cost, main.graphf_counter, main.graphf_depth, main.time_graphf, main.node_counter, main.max_node_stored
         elif str(algorithm) == 'Misplaced':
-            main.graphSearch(initialState,main.function_0, main.misplaced)
+            main.graphSearch(initialState, main.function_0, main.misplaced)
             path, cost, counter, depth, runtime, nodes, max_stored, memory_rep = \
                 main.graphf_path, main.graphf_cost, main.graphf_counter, main.graphf_depth, main.time_graphf, main.node_counter, main.max_counter, main.max_rev_counter
         elif str(algorithm) == 'Sequences':
-            main.graphSearch(initialState,main.function_0, main.sequences)
+            main.graphSearch(initialState, main.function_0, main.sequences)
             path, cost, counter, depth, runtime, nodes, max_stored, memory_rep = \
                 main.graphf_path, main.graphf_cost, main.graphf_counter, main.graphf_depth, main.time_graphf, main.node_counter, main.max_counter, main.max_rev_counter
-            
+        elif str(algorithm) == 'row_column':
+            main.graphSearch(initialState, main.function_0, main.row_column)
+            path, cost, counter, depth, runtime, nodes, max_stored, memory_rep = \
+                main.graphf_path, main.graphf_cost, main.graphf_counter, main.graphf_depth, main.time_graphf, main.node_counter, main.max_counter, main.max_rev_counter
+        elif str(algorithm) == 'nilssons_sequence':
+            main.graphSearch(initialState, main.function_0, main.nilssons_sequence)
+            path, cost, counter, depth, runtime, nodes, max_stored, memory_rep = \
+                main.graphf_path, main.graphf_cost, main.graphf_counter, main.graphf_depth, main.time_graphf, main.node_counter, main.max_counter, main.max_rev_counter
+        
+
     def resetGrid(self):
         """
         Resets the grid and step counter to the initial state

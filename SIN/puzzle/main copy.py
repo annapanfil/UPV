@@ -151,6 +151,62 @@ def sequences(state: str):
     
     return total
 
+# h4: Number of tiles out of row + Number of tiles out of column
+def row_column(state: str):
+    rows = [[1, 2, 3], [8, 0, 4], [7, 6, 5]]
+    cols = [[1, 8, 7], [2, 0, 6], [3, 4, 5]]
+
+    tot = 0
+    for i in range(len(state)):
+        tile = int(state[i])
+        if tile not in rows[i//3]:
+            tot += 1
+        if tile not in cols[i%3]:
+            tot += 1
+
+    print(f"row_column total = {tot}")
+    return tot   
+
+# h5: n-Max Swap
+# Assume you can swap any tile with the ‘space’. Use the cost of the
+# optimal solution to this problem as a heuristic for the 8-puzzle.
+def n_max_swap(state: str):
+    new_state = state
+    total = 0
+    while new_state != end_state:
+        if state[4] != "0":
+            place = new_state.find("0")
+            number_to_change = end_state[place]
+            new_place = new_state.find(number_to_change)
+        else:
+            new_place = 0
+            while state[new_place] == end_state[new_place]:
+                new_place += 1
+            number_to_change = state[new_place]
+
+        # new_state[place] = number_to_change
+        # new_state[new_place] = 0
+
+        new_state = new_state[:place] + number_to_change + new_state[place+1:] 
+        new_state = new_state[:new_place] + "0" + new_state[new_place+1:] 
+        total += 1
+    return total
+
+# h7: Nilsson’s Sequence Score h(n) = P(n) + 3 S(n)
+# P(n): Sum of Manhattan distances of each tile from its proper position
+# S(n): A sequence score obtained by checking around the non-central
+# squares in turn, allotting 2 for every tile not followed by its proper
+# successor and 0 for every other tile, except that a piece in the
+# center scores 1
+def nilssons_sequence(state: str):
+    total = getManhattanDistance(state)
+    
+    total += sequences(state)
+    if state[4] != 0:
+        total -= 2 * 3 # blank not in the center isn't punished
+    
+    return total
+
 def function_0(x):
     return 0
 
@@ -501,3 +557,7 @@ def IDA_B(inputState,function_h):
 
     return 1    
 
+
+if __name__ == "__main__":
+    print("row_column", row_column("012345678"))
+    print("n_max_swap", n_max_swap("012345678"))

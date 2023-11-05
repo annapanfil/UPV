@@ -86,7 +86,7 @@ dateColumn = "BIRTH_DATE"
 # Format of the previous date
 dateFormat = '%d/%m/%Y'
 # Which text string will represent missing data
-missingValue = "NULL"
+missingValue = ""
 ```
 
 We load the file **data/DQIinfantFeeding.csv** in a **data.frame** named **repository**:
@@ -168,7 +168,7 @@ We will find the missing data in the repository and calculate the corresponding 
 NAmatrix <- !is.na(repository)
 sumNAmatrix <- apply(NAmatrix,2,sum)
 completenessByColumn <- round(sumNAmatrix/N*100,2)
-completenessByColumn
+knitr::kable(completenessByColumn)
 ```
 
 Next, we will calculate and display the overall percentage of missing data:
@@ -186,7 +186,7 @@ knitr::kable(table(repository$DEL_TYPE_ANE), format = "markdown")
 
 📝 *DISCUSS RESULTS*
 
-We have many missing values in Apgar score and some in weight column. Other features are complete. It means 95.12% of our data is complete. It's quite high score. However, the number of missing values for Apgar score may exclude this feature from prediction further. However, it seems that not all values are considered. E.g. for anestestesia type we have 135 values with empty string, which should probably be treated as a null value as well.
+We have 81.41% of complete data. The most incomplete column is DEL_IN_INTRACA, which has only 3.66% values, which means we probably can't use it for models. We also have many missing values -- over 50% in Apgar score (NEO_APGAR_NUM) and TYPE_A. The number of missing values for these columns may also exclude these feature from prediction further. NEO_PHCORD_TXT has over 70% complete values, so we can try to take care of it. Other features are quite complete, however, only patient id and birthdate were filled for all cases.
 
 ------------------------------------------------------------------------
 
@@ -244,7 +244,7 @@ globalCompleteness <- rowMeans(resCompletenessByColumn, na.rm = TRUE)
 
 p <-
   plot_ly(
-    x = index(globalCompleteness),
+    x = index(resCompletenessByColumn),
     y = globalCompleteness,
     name = names(globalCompleteness),
     type = 'scatter',
@@ -263,7 +263,9 @@ p
 
 📝 *DISCUSS RESULTS*
 
-The incompleteness of the data comes mostly from missing Apgar scores. There are also some weights missing. The incompletness is fluctuant and we can't see any pattern in misses. However, as mentioned in previous task, some of the null values aren't recognized as such.
+The incompleteness is fluctuant and we can't see any pattern in misses. However, we can see that some values weren't traced from the beginning. E.g. neo_phcord_txt was monitored from April 2010 and del_in_intraca even later -- in March 2011.
+
+Overall we can see that the completness raised in the IIQ of 2010, when neo_phcord started to be monitored. Then it remained between 78% and 86% until october 2014. We can see a huge drop in the end of 2011, confirmed by low score in neo_apgar_num, del_type_a and neo_phcord_txt completness. Also, there is also even bigger drop in the end -- November 2014, when it reached only 68%. We can see that neo_apgar_num, del_type_a are mostly incomplete in this month and del_type_ane and neo_weight num have significantly dropped.
 
 ------------------------------------------------------------------------
 
@@ -361,7 +363,7 @@ Either using the web application, or obtaining the graphs in RStudio, we will st
 
 📝 *DISCUSS RESULTS*
 
-![](images/Zrzut ekranu z 2023-10-25 13-48-12.png)
+![](images/Zrzut%20ekranu%20z%202023-10-25%2013-48-12.png)
 
 To see the results we've used the web application. We've also looked into these articles to learn how to interpret IGT plots: [article1](http://personales.upv.es/carsaesi/EHRtemporalVariability/EHRtemporalVariability.html), [article2](https://www.researchgate.net/figure/Information-Geometric-Temporal-IGT-plot-of-demography-and-cardiovascular-disease-coding_fig1_335844364)
 
